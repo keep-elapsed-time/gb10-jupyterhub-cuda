@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+
+  # ── Build the notebook image (run once: docker compose build notebook) ──
+  notebook:
+    build:
+      context: ./notebook
+      dockerfile: Dockerfile
+    image: jupyterhub-notebook-cuda:latest
+    # This service only exists to build the image; hub spawns real instances.
+    command: echo "Notebook image built."
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── JupyterHub ──────────────────────────────────────────────────────────
+  jupyterhub:
+    image: jupyterhub/jupyterhub:latest
+    container_name: jupyterhub
+    depends_on:
+      - notebook
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./jupyterhub_config.py:/srv/jupyterhub/jupyterhub_config.py
+      - jupyterhub-db:/data
+    environment:
+      - DOCKER_NETWORK_NAME=jupyterhub-net
+      - JUPYTERHUB_ADMIN=${JUPYTERHUB_ADMIN:-admin}
+    networks:
+      - jupyterhub-net
+    command: >
+      bash -c "pip install -q dockerspawner jupyterhub-nativeauthenticator docker && jupyterhub -f /srv/jupyterhub/jupyterhub_config.py"
+    restart: always
+
+networks:
+  jupyterhub-net:
+    name: jupyterhub-net
+
+volumes:
+  jupyterhub-db:
