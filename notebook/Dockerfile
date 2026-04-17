@@ -1,11 +1,8 @@
 # ─────────────────────────────────────────────────────────────────
 # Custom JupyterHub single-user notebook image
-# Base: Ubuntu 24.04 (Python 3.12 built-in) + CUDA devel (nvcc)
-#
-# CUDA 12.8.x = minimum for Blackwell (GB10).
-# To upgrade to CUDA 13.x when released: change CUDA_VER below.
+# CUDA 13.2.0 devel (nvcc included) + Ubuntu 24.04 (Python 3.12)
 # ─────────────────────────────────────────────────────────────────
-ARG CUDA_VER=12.8.1
+ARG CUDA_VER=13.2.0
 ARG UBUNTU_VER=24.04
 
 FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER}
@@ -17,7 +14,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 
 # ── System dependencies ───────────────────────────────────────────
-# Ubuntu 24.04 ships Python 3.12 natively — no PPA needed
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-dev python3-pip python3-venv \
         git curl wget build-essential ca-certificates \
@@ -37,12 +33,14 @@ RUN pip install --no-cache-dir --break-system-packages \
         ipywidgets \
         ipykernel
 
-# ── PyTorch with CUDA 12.8 ────────────────────────────────────────
+# ── PyTorch ───────────────────────────────────────────────────────
+# Update --index-url when PyTorch releases cu132 wheels.
+# cu128 wheels are ABI-compatible with CUDA 13.x runtime.
 RUN pip install --no-cache-dir --break-system-packages \
         torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/cu128
 
-# ── flash-attention (compiled with nvcc) ─────────────────────────
+# ── flash-attention (compiled with nvcc from CUDA 13.2) ───────────
 RUN pip install --no-cache-dir --break-system-packages \
         packaging ninja && \
     pip install --no-cache-dir --break-system-packages \
@@ -55,7 +53,7 @@ RUN pip install --no-cache-dir --break-system-packages \
         pandas numpy matplotlib seaborn scikit-learn \
         tqdm rich
 
-# ── Non-root user matching JupyterHub convention ──────────────────
+# ── Non-root user ─────────────────────────────────────────────────
 ARG NB_USER=jovyan
 ARG NB_UID=1000
 RUN useradd -m -s /bin/bash -N -u ${NB_UID} ${NB_USER}
