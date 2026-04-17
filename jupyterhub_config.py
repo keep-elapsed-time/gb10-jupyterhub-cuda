@@ -36,15 +36,18 @@ c.JupyterHub.authenticator_class = 'nativeauthenticator.NativeAuthenticator'
 
 ADMIN = os.environ.get('JUPYTERHUB_ADMIN', 'admin')
 c.Authenticator.admin_users = {ADMIN}
-# allowed_users must include admin — otherwise NativeAuthenticator
-# blocks even admin after signup ("not authorized yet")
 c.Authenticator.allowed_users = {ADMIN}
-
-c.NativeAuthenticator.open_signup = False   # Admin approves new users at /hub/authorize
+c.NativeAuthenticator.open_signup = False
 
 # ── Network ───────────────────────────────────────────────────────
-c.JupyterHub.hub_ip = 'jupyterhub'
+# bind_url: what the browser connects to (external-facing)
+# hub_ip: bind all interfaces inside the container
+# hub_connect_ip: what spawned notebook containers use to reach the hub
+c.JupyterHub.bind_url = 'http://:8000'
+c.JupyterHub.hub_ip = '0.0.0.0'
+c.JupyterHub.hub_connect_ip = 'jupyterhub'
 c.JupyterHub.hub_port = 8081
+
 c.JupyterHub.cookie_secret_file = '/data/jupyterhub_cookie_secret'
 
 # ── DB ────────────────────────────────────────────────────────────
