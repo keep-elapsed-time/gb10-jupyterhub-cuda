@@ -40,14 +40,12 @@ c.Authenticator.allowed_users = {ADMIN}
 c.NativeAuthenticator.open_signup = False
 
 # ── Network ───────────────────────────────────────────────────────
-# PUBLIC_URL: the URL users type in the browser (host machine IP/hostname).
-# Must match exactly — cookies are scoped to this origin.
-# Set via environment variable so it's easy to change without editing this file.
-PUBLIC_HOST = os.environ.get('JUPYTERHUB_PUBLIC_HOST', '192.168.21.3')
-PUBLIC_PORT = os.environ.get('JUPYTERHUB_PUBLIC_PORT', '8000')
-c.JupyterHub.bind_url = f'http://{PUBLIC_HOST}:{PUBLIC_PORT}'
-
-# Hub API: bind to all interfaces; spawned containers reach hub by container name
+# bind_url MUST use 0.0.0.0 inside the container — binding to the
+# host's IP (e.g. 192.168.21.3) fails because that IP doesn't exist
+# inside Docker. JupyterHub uses the incoming request's Host header
+# to generate redirect URLs, so access the hub via the machine IP
+# (http://192.168.21.3:8000) and redirects will point there correctly.
+c.JupyterHub.bind_url = 'http://0.0.0.0:8000'
 c.JupyterHub.hub_ip = '0.0.0.0'
 c.JupyterHub.hub_connect_ip = 'jupyterhub'
 c.JupyterHub.hub_port = 8081
