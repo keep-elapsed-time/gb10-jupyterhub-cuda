@@ -1,6 +1,9 @@
 # ─────────────────────────────────────────────────────────────────
 # Custom JupyterHub single-user notebook image
-# CUDA 13.2.0 devel (nvcc included) + Ubuntu 24.04 (Python 3.12)
+# CUDA 13.2.0 devel (nvcc) + Ubuntu 24.04 (Python 3.12)
+#
+# Key constraint: PyTorch CUDA version MUST match nvcc version.
+# CUDA 13.2 → use PyTorch cu132 wheels.
 # ─────────────────────────────────────────────────────────────────
 ARG CUDA_VER=13.2.0
 ARG UBUNTU_VER=24.04
@@ -21,16 +24,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -sf python3 /usr/bin/python \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ── Step 2: Remove PEP 668 guard (MUST come before any pip call) ─
-# Ubuntu 24.04 marks Python as "externally managed" to protect the OS.
-# Inside a Docker container this restriction serves no purpose.
-# Removing the marker lets pip install packages without flags or venvs.
+# ── Step 2: Remove PEP 668 guard (safe in Docker) ────────────────
 RUN rm -f /usr/lib/python3*/EXTERNALLY-MANAGED
-# NOTE: do NOT run `pip install --upgrade pip` — the Debian-installed
-# pip has no RECORD file and cannot uninstall itself. pip 24.0 is
-# sufficient for everything below.
 
-# ── Step 3: Verify nvcc is present ───────────────────────────────
+# ── Step 3: Verify nvcc ───────────────────────────────────────────
 RUN nvcc --version
 
 # ── Step 4: JupyterHub + JupyterLab ──────────────────────────────
@@ -41,14 +38,21 @@ RUN pip install --no-cache-dir \
         ipywidgets \
         ipykernel
 
-# ── Step 5: PyTorch ───────────────────────────────────────────────
-# cu128 wheels are ABI-compatible with CUDA 13.x runtime.
-# Switch to cu132 index-url once PyTorch releases those wheels.
+# ── Step 5: PyTorch cu132 (matches CUDA 13.2 nvcc) ───────────────
+# flash-attn requires torch.version.cuda == nvcc version at compile time.
+# Stable cu132 first; if not yet released, nightly cu130 as fallback.
 RUN pip install --no-cache-dir \
         torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/cu128
+        --index-url https://download.pytorch.org/whl/cu132 \
+    || pip install --no-cache-dir \
+        torch torchvision torchaudio \
+        --index-url https://download.pytorch.org/whl/nightly/cu130
 
-# ── Step 6: flash-attention (compiled by nvcc at build time) ──────
+# Confirm versions align
+RUN python3 -c "import torch; print('torch:', torch.__version__, '| cuda:', torch.version.cuda)"
+
+# ── Step 6: flash-attention (compiled with matching nvcc) ─────────
+ENV MAX_JOBS=4
 RUN pip install --no-cache-dir packaging ninja && \
     pip install --no-cache-dir flash-attn --no-build-isolation
 
@@ -59,7 +63,7 @@ RUN pip install --no-cache-dir \
         pandas numpy matplotlib seaborn scikit-learn \
         tqdm rich
 
-# ── Step 8: Non-root user (JupyterHub convention) ─────────────────
+# ── Step 8: Non-root user ─────────────────────────────────────────
 ARG NB_USER=jovyan
 ARG NB_UID=1000
 RUN useradd -m -s /bin/bash -N -u ${NB_UID} ${NB_USER}
