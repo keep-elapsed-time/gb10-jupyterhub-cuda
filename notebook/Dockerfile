@@ -21,8 +21,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -sf python3 /usr/bin/python \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ── Upgrade pip via get-pip.py (avoids Debian RECORD conflict) ────
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3
+# ── Remove PEP 668 guard (safe inside Docker; not an OS install) ──
+RUN rm -f /usr/lib/python3*/EXTERNALLY-MANAGED
+
+# ── Upgrade pip ───────────────────────────────────────────────────
+RUN pip install --upgrade pip
 
 # ── Verify nvcc ───────────────────────────────────────────────────
 RUN nvcc --version
