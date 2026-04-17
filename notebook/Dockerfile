@@ -1,9 +1,6 @@
 # ─────────────────────────────────────────────────────────────────
 # Custom JupyterHub single-user notebook image
 # CUDA 13.2.0 devel (nvcc) + Ubuntu 24.04 (Python 3.12)
-#
-# Key constraint: PyTorch CUDA version MUST match nvcc version.
-# CUDA 13.2 → use PyTorch cu132 wheels.
 # ─────────────────────────────────────────────────────────────────
 ARG CUDA_VER=13.2.0
 ARG UBUNTU_VER=24.04
@@ -39,8 +36,6 @@ RUN pip install --no-cache-dir \
         ipykernel
 
 # ── Step 5: PyTorch cu132 (matches CUDA 13.2 nvcc) ───────────────
-# flash-attn requires torch.version.cuda == nvcc version at compile time.
-# Stable cu132 first; if not yet released, nightly cu130 as fallback.
 RUN pip install --no-cache-dir \
         torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/cu132 \
@@ -48,10 +43,9 @@ RUN pip install --no-cache-dir \
         torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/nightly/cu130
 
-# Confirm versions align
 RUN python3 -c "import torch; print('torch:', torch.__version__, '| cuda:', torch.version.cuda)"
 
-# ── Step 6: flash-attention (compiled with matching nvcc) ─────────
+# ── Step 6: flash-attention ───────────────────────────────────────
 ENV MAX_JOBS=4
 RUN pip install --no-cache-dir packaging ninja && \
     pip install --no-cache-dir flash-attn --no-build-isolation
@@ -64,9 +58,17 @@ RUN pip install --no-cache-dir \
         tqdm rich
 
 # ── Step 8: Non-root user ─────────────────────────────────────────
+# nvidia/cuda Ubuntu images already occupy UID 1000 (ubuntu user).
+# Rename it to jovyan so JupyterHub's volume mapping works correctly.
 ARG NB_USER=jovyan
-ARG NB_UID=1000
-RUN useradd -m -s /bin/bash -N -u ${NB_UID} ${NB_USER}
+RUN existing=$(getent passwd 1000 | cut -d: -f1); \
+    if [ -n "$existing" ]; then \
+        usermod -l ${NB_USER} "$existing" && \
+        usermod -d /home/${NB_USER} -m ${NB_USER} && \
+        groupmod -n ${NB_USER} "$existing" 2>/dev/null || true; \
+    else \
+        useradd -m -s /bin/bash -N -u 1000 ${NB_USER}; \
+    fi
 
 USER ${NB_USER}
 WORKDIR /home/${NB_USER}
