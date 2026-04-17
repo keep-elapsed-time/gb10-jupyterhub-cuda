@@ -19,14 +19,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git curl wget build-essential ca-certificates \
         libssl-dev libffi-dev \
     && ln -sf python3 /usr/bin/python \
-    && pip install --upgrade pip --break-system-packages \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── Upgrade pip via get-pip.py (avoids Debian RECORD conflict) ────
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3
 
 # ── Verify nvcc ───────────────────────────────────────────────────
 RUN nvcc --version
 
 # ── JupyterHub single-user + JupyterLab ──────────────────────────
-RUN pip install --no-cache-dir --break-system-packages \
+RUN pip install --no-cache-dir \
         "jupyterhub==4.*" \
         "jupyterlab==4.*" \
         notebook \
@@ -34,20 +36,16 @@ RUN pip install --no-cache-dir --break-system-packages \
         ipykernel
 
 # ── PyTorch ───────────────────────────────────────────────────────
-# Update --index-url when PyTorch releases cu132 wheels.
-# cu128 wheels are ABI-compatible with CUDA 13.x runtime.
-RUN pip install --no-cache-dir --break-system-packages \
+RUN pip install --no-cache-dir \
         torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/cu128
 
 # ── flash-attention (compiled with nvcc from CUDA 13.2) ───────────
-RUN pip install --no-cache-dir --break-system-packages \
-        packaging ninja && \
-    pip install --no-cache-dir --break-system-packages \
-        flash-attn --no-build-isolation
+RUN pip install --no-cache-dir packaging ninja && \
+    pip install --no-cache-dir flash-attn --no-build-isolation
 
 # ── Common ML libraries ───────────────────────────────────────────
-RUN pip install --no-cache-dir --break-system-packages \
+RUN pip install --no-cache-dir \
         transformers accelerate datasets peft \
         bitsandbytes sentencepiece \
         pandas numpy matplotlib seaborn scikit-learn \
