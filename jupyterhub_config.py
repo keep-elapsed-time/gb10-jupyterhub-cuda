@@ -34,21 +34,23 @@ c.DockerSpawner.volumes = {
 # ── Auth ──────────────────────────────────────────────────────────
 c.JupyterHub.authenticator_class = 'nativeauthenticator.NativeAuthenticator'
 
-ADMIN = os.environ.get('JUPYTERHUB_ADMIN', 'admin')
+ADMIN = os.environ.get('JUPYTERHUB_ADMIN', 'aifintech')
 c.Authenticator.admin_users = {ADMIN}
 c.Authenticator.allowed_users = {ADMIN}
 c.NativeAuthenticator.open_signup = False
 
 # ── Network ───────────────────────────────────────────────────────
-# bind_url: what the browser connects to (external-facing)
-# hub_ip: bind all interfaces inside the container
-# hub_connect_ip: what spawned notebook containers use to reach the hub
-c.JupyterHub.bind_url = 'http://:8000'
+# PUBLIC_URL: the URL users type in the browser (host machine IP/hostname).
+# Must match exactly — cookies are scoped to this origin.
+# Set via environment variable so it's easy to change without editing this file.
+PUBLIC_HOST = os.environ.get('JUPYTERHUB_PUBLIC_HOST', '192.168.21.3')
+PUBLIC_PORT = os.environ.get('JUPYTERHUB_PUBLIC_PORT', '8000')
+c.JupyterHub.bind_url = f'http://{PUBLIC_HOST}:{PUBLIC_PORT}'
+
+# Hub API: bind to all interfaces; spawned containers reach hub by container name
 c.JupyterHub.hub_ip = '0.0.0.0'
 c.JupyterHub.hub_connect_ip = 'jupyterhub'
 c.JupyterHub.hub_port = 8081
 
 c.JupyterHub.cookie_secret_file = '/data/jupyterhub_cookie_secret'
-
-# ── DB ────────────────────────────────────────────────────────────
 c.JupyterHub.db_url = 'sqlite:////data/jupyterhub.sqlite'
